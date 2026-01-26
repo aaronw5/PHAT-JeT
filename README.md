@@ -1,2 +1,2 @@
 # PHAT-JeT
-Path Hierarchal Attention Transformer for Efficient Particle Jet Tagging
+Patch Hierarchal Attention Transformer for Efficient Particle Jet Tagging
