@@ -157,17 +157,6 @@ def main():
 	parser.add_argument("--morton_grid_size", type=float, default=0.05, help="Grid size for morton sorting (separate from GeometricCPE grid_size)")
 	parser.add_argument("--aggregation", choices=["mean", "max"], default="max", help="Aggregation method for final pooling")
 	parser.add_argument("--weights", help="Path to weights .h5 file (defaults to save_dir/best.weights.h5)")
-	parser.add_argument(
-		"--use_serialized_model",
-		action="store_true",
-		help="Use the serialized PTv3 variant from PointTransformer_serialized",
-	)
-	parser.add_argument(
-		"--serialize_by",
-		choices=["morton", "pt", "kt"],
-		default="morton",
-		help="Serialization strategy for the serialized PTv3 model",
-	)
 	parser.add_argument("--ffn_activation", choices=["relu", "gelu", "swish", "silu", "tanh"], default="gelu", help="Activation function for feed-forward network (relu is fastest, gelu is default)")
 	parser.add_argument("--use_jedi_hybrid", action="store_true", help="Use JEDI-PTv3 Hybrid (O(N) global interaction)")
 	parser.add_argument("--disable_cpe", action="store_true", help="Disable CPE in JEDI hybrid")
@@ -303,38 +292,20 @@ def main():
 			# If a full-model H5 was saved (e.g., by ModelCheckpoint without save_weights_only=True),
 			# we need to pass custom objects to reconstruct the model.
 			try:
-				if args.use_serialized_model:
-					from models.PointTransformer_serialized import (
-						PTv3Block as SerializedPTv3Block,
-						GeometricCPE as SerializedGeometricCPE,
-						PatchedAttention as SerializedPatchedAttention,
-						QuantizedRPE as SerializedQuantizedRPE,
-						SerializedPooling2D,
-						Serialization2D,
-					)
-					custom_objects = {
-						"PTv3Block": SerializedPTv3Block,
-						"GeometricCPE": SerializedGeometricCPE,
-						"PatchedAttention": SerializedPatchedAttention,
-						"QuantizedRPE": SerializedQuantizedRPE,
-						"SerializedPooling2D": SerializedPooling2D,
-						"Serialization2D": Serialization2D,
-					}
-				else:
-					from models.PointTransformerV3TF import (
+				from models.PointTransformerV3TF import (
 						PTv3Block,
 						GeometricCPE,
 						PatchedAttention,
 						QuantizedRPE,
 						GeometricPooling,
 					)
-					custom_objects = {
+				custom_objects = {
 						"PTv3Block": PTv3Block,
 						"GeometricCPE": GeometricCPE,
 						"PatchedAttention": PatchedAttention,
 						"QuantizedRPE": QuantizedRPE,
 						"GeometricPooling": GeometricPooling,
-					}
+		        }
 
 				model = tf.keras.models.load_model(
 					weights_path, custom_objects=custom_objects, compile=False
