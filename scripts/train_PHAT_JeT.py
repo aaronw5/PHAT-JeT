@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-Train a PointTransformerV3-like TensorFlow model on jet datasets (hls4ml, top, QG, or jetclass),
+Train a PHAT-JeT TensorFlow model on jet datasets (hls4ml, top, QG, or jetclass),
 profiling performance and generating ROC curves.
 """
 import os
@@ -25,7 +25,7 @@ from sklearn.metrics import accuracy_score, roc_curve, auc, roc_auc_score
 import matplotlib.pyplot as plt
 
 # import model builders
-from models.PHAT_JeT import build_ptv3_jet_classifier, build_jedi_ptv3_hybrid
+from models.PHAT_JeT import build_phat_jet_classifier
 
 
 # ---------------------------
@@ -316,8 +316,6 @@ def parse_args():
 		p.add_argument("--dropout", type=float, default=0.0)
 		p.add_argument("--aggregation", choices=["mean", "max"], default="max")
 		p.add_argument("--model_size", choices=["small", "small_2layer_no_downsamp", "small_2layer_2_downsamp", "matched", "medium", "large"], default="small")
-		p.add_argument('--use_jedi_hybrid', action='store_true', help='Use JEDI-PTv3 Hybrid (O(N) global interaction instead of attention)')
-		p.add_argument('--disable_cpe', action='store_true', help='Disable CPE in JEDI hybrid (for pure JEDI-style permutation invariance)')
 		p.add_argument("--ffn_activation", choices=["relu", "gelu", "swish", "silu", "tanh"], default="gelu", help="Activation function for feed-forward network (relu is fastest, gelu is default)")
 		p.add_argument("--jit_compile", action="store_true", help="Enable XLA JIT compilation for faster training (5-15%% speedup on modern GPUs)")
 		p.add_argument("--use_flash_attention", action="store_true", help="Enable Flash Attention for faster and more memory-efficient attention (requires TensorFlow 2.11+ and compatible GPU)")
@@ -436,24 +434,7 @@ def main():
 
 		# build and compile model
 		logging.info("Flash Attention enabled: %s", args.use_flash_attention)
-		if args.use_jedi_hybrid:
-			logging.info("Building JEDI-PTv3 Hybrid model (O(N) global interaction)")
-			model = build_jedi_ptv3_hybrid(
-				num_particles=num_particles,
-				output_dim=output_dim,
-				enc_dims=enc_dims,
-				enc_layers=enc_layers,
-				enc_strides=enc_strides,
-				cpe_k=cpe_k,
-				grid_size=args.grid_size,
-				use_pool=(not args.disable_pool),
-				use_cpe=(not args.disable_cpe),
-				dropout=args.dropout,
-				aggregation=args.aggregation,
-				ffn_activation=args.ffn_activation,
-			)
-		else:
-			model = build_ptv3_jet_classifier(
+		model = build_phat_jet_classifier(
 				num_particles=num_particles,
 				output_dim=output_dim,
 				enc_dims=enc_dims,
@@ -464,7 +445,7 @@ def main():
 				cpe_k=cpe_k,
 				grid_size=args.grid_size,
 				use_rpe=use_rpe,
-				use_cpe=(not args.disable_cpe),
+				use_cpe=True,
 				use_pool=(not args.disable_pool),
 				dropout=args.dropout,
 				aggregation=args.aggregation,
@@ -472,9 +453,9 @@ def main():
 				use_flash_attention=args.use_flash_attention,
 				use_patch_messages=args.use_patch_messages,
 				patch_tokenizer_mode=args.patch_tokenizer_mode,
-			    message_proj=args.message_proj,
-			    message_gated=args.message_gated,
-			)
+		    message_proj=args.message_proj,
+		    message_gated=args.message_gated,
+		)
 		model.compile(
 				optimizer=tf.keras.optimizers.Adam(),
 				loss=loss_fn,

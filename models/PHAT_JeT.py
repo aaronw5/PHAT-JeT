@@ -465,49 +465,7 @@ class PatchMessageBroadcast(layers.Layer):
 
 
 # =========================
-# JEDI-inspired O(N) pieces
-# =========================
-
-class GlobalInteractionLayer(layers.Layer):
-    def __init__(self, latent_dim, **kwargs):
-        super().__init__(**kwargs)
-        self.latent_dim = latent_dim
-
-    def build(self, input_shape):
-        self.dense1 = layers.Dense(self.latent_dim, name=f'{self.name}_global_dense')
-        self.dense2 = layers.Dense(self.latent_dim, name=f'{self.name}_particle_dense')
-        self.norm = layers.BatchNormalization(name=f'{self.name}_norm')
-        super().build(input_shape)
-
-    def call(self, inputs, training=None):
-        global_context = tf.reduce_mean(inputs, axis=1, keepdims=False)  # [B, C]
-        global_transformed = self.dense1(global_context)                  # [B, latent_dim]
-        global_broadcast = tf.expand_dims(global_transformed, axis=1)     # [B,1,latent_dim]
-        particle_transformed = self.dense2(inputs)                        # [B,N,latent_dim]
-        output = global_broadcast + particle_transformed
-        return self.norm(output, training=training)
-
-
-class ChannelMixingLayer(layers.Layer):
-    def __init__(self, feature_dim, hidden_units=None, **kwargs):
-        super().__init__(**kwargs)
-        self.feature_dim = feature_dim
-        self.hidden_units = hidden_units or (feature_dim * 4)
-
-    def build(self, input_shape):
-        self.dense1 = layers.Dense(self.hidden_units, activation='relu', name=f'{self.name}_expand')
-        self.dense2 = layers.Dense(self.feature_dim, name=f'{self.name}_contract')
-        self.norm = layers.BatchNormalization(name=f'{self.name}_norm')
-        super().build(input_shape)
-
-    def call(self, inputs, training=None):
-        x = self.dense1(inputs)
-        x = self.dense2(x)
-        return self.norm(x, training=training)
-
-
-# =========================
-# Geometric pooling (as you had)
+# Geometric pooling
 # =========================
 
 class GeometricPooling(layers.Layer):
@@ -556,7 +514,7 @@ class GeometricPooling(layers.Layer):
 # Blocks
 # =========================
 
-class PTv3Block(layers.Layer):
+class PHATBlock(layers.Layer):
     """
     Local patched attention + optional patch-to-patch message passing + FFN.
     No TÃ—T attention is ever built.
@@ -644,58 +602,11 @@ class PTv3Block(layers.Layer):
 
         return [x, coords]
 
-
-class JEDIPTv3Block(layers.Layer):
-    """
-    Hybrid: optional CPE + JEDI GlobalInteraction + FFN.
-    Options:
-      - use_cpe
-      - ffn_activation: "relu" or "gelu"
-    """
-    def __init__(self, d_model, d_ff, cpe_k=8, grid_size=0.05, dropout=0.0, use_cpe=True, ffn_activation="relu", **kwargs):
-        super().__init__(**kwargs)
-        assert ffn_activation in ("relu", "gelu")
-        self.use_cpe = use_cpe
-        if use_cpe:
-            self.cpe = GeometricCPE(d_model, kernel_size=cpe_k, grid_size=grid_size)
-
-        self.global_interaction = GlobalInteractionLayer(d_model)
-        self.drop1 = layers.Dropout(dropout)
-        self.norm1 = layers.BatchNormalization()
-
-        self.ffn = tf.keras.Sequential([
-            layers.Dense(d_ff, activation=ffn_activation),
-            layers.Dropout(dropout),
-            layers.Dense(d_model),
-        ])
-        self.drop2 = layers.Dropout(dropout)
-        self.norm2 = layers.BatchNormalization()
-
-    def call(self, inputs, training=False):
-        x, coords = inputs
-        eta, phi = coords[..., 0], coords[..., 1]
-
-        if self.use_cpe:
-            x = self.cpe(x, eta, phi)
-
-        y = self.global_interaction(x, training=training)
-        y = self.drop1(y, training=training)
-        x = x + y
-        x = self.norm1(x, training=training)
-
-        y = self.ffn(x, training=training)
-        y = self.drop2(y, training=training)
-        x = x + y
-        x = self.norm2(x, training=training)
-
-        return [x, coords]
-
-
 # =========================
 # Full Models
 # =========================
 
-def build_ptv3_jet_classifier(
+def build_phat_jet_classifier(
     num_particles=150,
     output_dim=5,
     enc_dims=[64, 128, 256],
@@ -717,7 +628,7 @@ def build_ptv3_jet_classifier(
     message_gated=False,
     use_flash_attention=False
 ):
-    """Build hierarchical PTv3-inspired jet classifier."""
+    """Build hierarchical PHAT-JeT jet classifier."""
 
     # Input: [pt, eta, phi]
     features_input = layers.Input((num_particles, 3), name="features")
@@ -727,7 +638,7 @@ def build_ptv3_jet_classifier(
 
     for i in range(len(enc_dims)):
         for _ in range(enc_layers[i]):
-            x, coords = PTv3Block(
+            x, coords = PHATBlock(
                 d_model=enc_dims[i],
                 d_ff=enc_dims[i] * 4,
                 num_heads=enc_heads[i],
@@ -764,93 +675,13 @@ def build_ptv3_jet_classifier(
 
     return Model(inputs=features_input, outputs=outputs)
 
-
-def build_jedi_ptv3_hybrid(
-    num_particles=150,
-    output_dim=5,
-    enc_dims=[64, 128, 256],
-    enc_layers=[1, 1, 1],
-    enc_strides=[2, 2],
-    cpe_k=8,
-    grid_size=0.05,
-    use_pool=True,
-    use_cpe=True,
-    dropout=0.0,
-    aggregation="max",
-    ffn_activation="relu",
-):
-    """
-    Build JEDI-PTv3 Hybrid jet classifier.
-
-    Combines the best of both worlds:
-    - GeometricCPE for geometry awareness (from PTv3)
-    - GlobalInteractionLayer for O(N) particle mixing (from JEDI)
-    - BatchNorm post-operation for stability (from JEDI)
-    - ReLU activation for efficiency (from JEDI)
-
-    This architecture achieves similar or better accuracy than standard PTv3
-    while being ~40% more efficient (no O(N×P) attention, no softmax).
-
-    Args:
-        num_particles: Number of input particles
-        output_dim: Number of output classes
-        enc_dims: Feature dimensions for each stage
-        enc_layers: Number of transformer blocks per stage
-        enc_strides: Downsampling strides between stages
-        cpe_k: Kernel size for Geometric CPE
-        grid_size: Grid resolution for CPE
-        use_pool: Whether to use GeometricPooling between stages
-        use_cpe: Whether to use Convolutional Position Encoding
-        dropout: Dropout rate
-        aggregation: Global pooling method ('mean' or 'max')
-
-    Returns:
-        Keras Model for jet classification
-    """
-
-    # Input: [pt, eta, phi]
-    features_input = layers.Input((num_particles, 3), name="features")
-    coords = features_input[..., 1:3]
-    x = layers.Dense(enc_dims[0], activation="relu")(features_input)
-
-    for i in range(len(enc_dims)):
-        for _ in range(enc_layers[i]):
-            x, coords = JEDIPTv3Block(
-                d_model=enc_dims[i],
-                d_ff=enc_dims[i] * 4,
-                cpe_k=cpe_k,
-                grid_size=grid_size,
-                dropout=dropout,
-                use_cpe=use_cpe,
-                ffn_activation=ffn_activation,
-            )([x, coords])
-
-        if i < len(enc_dims) - 1:
-            if use_pool:
-                x, coords = GeometricPooling(
-                    out_dim=enc_dims[i + 1],
-                    stride=enc_strides[i]
-                )([x, coords])
-            else:
-                x = layers.Dense(enc_dims[i + 1])(x)
-
-    x = tf.reduce_mean(x, axis=1) if aggregation == "mean" else tf.reduce_max(x, axis=1)
-
-    x = layers.Dense(enc_dims[-1], activation="relu")(x)
-    x = layers.Dropout(dropout)(x)
-
-    activation = "sigmoid" if output_dim == 1 else "softmax"
-    outputs = layers.Dense(output_dim, activation=activation)(x)
-    return Model(inputs=features_input, outputs=outputs)
-
-
 # =========================
 # Example usage
 # =========================
 
 if __name__ == "__main__":
-    # PTv3-like model (LOCAL attention + optional PATCH messages)
-    model = build_ptv3_jet_classifier(
+    # PHAT-JeT model (LOCAL attention + optional PATCH messages)
+    model = build_phat_jet_classifier(
         num_particles=150,
         output_dim=5,
         enc_dims=[64, 128, 256],

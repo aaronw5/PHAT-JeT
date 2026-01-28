@@ -17,7 +17,7 @@ import tensorflow as tf
 from sklearn.metrics import accuracy_score, roc_curve, auc, roc_auc_score
 import matplotlib.pyplot as plt
 
-from models.PHAT_JeT import build_ptv3_jet_classifier, build_jedi_ptv3_hybrid
+from models.PHAT_JeT import build_phat_jet_classifier
 
 
 def profile_gpu_memory_during_inference(model: tf.keras.Model, input_data: np.ndarray) -> tuple[float, float]:
@@ -158,10 +158,6 @@ def main():
 	parser.add_argument("--aggregation", choices=["mean", "max"], default="max", help="Aggregation method for final pooling")
 	parser.add_argument("--weights", help="Path to weights .h5 file (defaults to save_dir/best.weights.h5)")
 	parser.add_argument("--ffn_activation", choices=["relu", "gelu", "swish", "silu", "tanh"], default="gelu", help="Activation function for feed-forward network (relu is fastest, gelu is default)")
-	parser.add_argument("--use_jedi_hybrid", action="store_true", help="Use JEDI-PTv3 Hybrid (O(N) global interaction)")
-	parser.add_argument("--disable_cpe", action="store_true", help="Disable CPE in JEDI hybrid")
-	parser.add_argument("--cpe_type", choices=["original", "sinusoidal", "pairwise", "depthwise", "quantized"], default="original",
-		help="Type of CPE to use: original (scatter/gather), sinusoidal (fastest), pairwise (k-NN), depthwise (1D conv), quantized (fixed grid)")
 	parser.add_argument("--use_flash_attention", action="store_true")
 	
 	parser.add_argument("--patch_tokenizer_mode",
@@ -190,7 +186,7 @@ def main():
 
 	# Logging
 	os.makedirs(args.save_dir, exist_ok=True)
-	log_path = os.path.join(args.save_dir, "test_ptv3.log")
+	log_path = os.path.join(args.save_dir, "test_phat_jet.log")
 	logging.basicConfig(filename=log_path, filemode="w", level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 	cwd = os.getcwd()
 	print(f"Running in directory: {cwd}")
@@ -225,28 +221,9 @@ def main():
 	cpe_k = cfg["cpe_k"]
 	use_rpe = args.use_rpe or cfg["use_rpe"]
 
-	# Build model: JEDI hybrid, serialized, or standard PTv3
-	if args.use_jedi_hybrid:
-		logging.info("Building JEDI-PTv3 Hybrid model (O(N) global interaction)")
-		logging.info("CPE type: %s, CPE enabled: %s", args.cpe_type, not args.disable_cpe)
-		model = build_jedi_ptv3_hybrid(
-			num_particles=num_particles,
-			output_dim=output_dim,
-			enc_dims=enc_dims,
-			enc_layers=enc_layers,
-			enc_strides=enc_strides,
-			cpe_k=cpe_k,
-			grid_size=args.grid_size,
-			use_pool=(not args.disable_pool),
-			use_cpe=(not args.disable_cpe),
-			cpe_type=args.cpe_type,
-			dropout=0.0,
-			aggregation=args.aggregation,
-		)
-	else:
-		logging.info("Building PTv3 model (default fallback)")
-		logging.info("CPE type: %s, CPE enabled: %s", args.cpe_type, not args.disable_cpe)
-		model = build_ptv3_jet_classifier(
+	# Build PHAT-JeT model
+	logging.info("Building PHAT-JeT model")
+	model = build_phat_jet_classifier(
 				num_particles=num_particles,
 				output_dim=output_dim,
 				enc_dims=enc_dims,
@@ -258,16 +235,16 @@ def main():
 				cpe_k=cpe_k,
 				grid_size=args.grid_size,
 				use_pool=(not args.disable_pool),
-				use_cpe=(not args.disable_cpe),
+				use_cpe=True,
 				dropout=0.0,
 				aggregation=args.aggregation,
 				ffn_activation=args.ffn_activation,
 				use_patch_messages=args.use_patch_messages,
 			    patch_tokenizer_mode=args.patch_tokenizer_mode,
-			    message_proj=args.message_proj,
-			    message_gated=args.message_gated,
-			    use_flash_attention=args.use_flash_attention
-			)
+		    message_proj=args.message_proj,
+		    message_gated=args.message_gated,
+		    use_flash_attention=args.use_flash_attention
+		)
 	model.summary(print_fn=lambda s: logging.info(s))
 	logging.info("Preset: %s", args.model_size)
 	logging.info("Hyperparams: dims=%s layers=%s heads=%s strides=%s patch=%s", enc_dims, enc_layers, enc_heads, enc_strides, enc_patch_sizes)
@@ -293,14 +270,14 @@ def main():
 			# we need to pass custom objects to reconstruct the model.
 			try:
 				from models.PHAT_JeT import (
-					PTv3Block,
+					PHATBlock,
 					GeometricCPE,
 					PatchedAttention,
 					QuantizedRPE,
 					GeometricPooling,
 				)
 				custom_objects = {
-					"PTv3Block": PTv3Block,
+					"PHATBlock": PHATBlock,
 					"GeometricCPE": GeometricCPE,
 					"PatchedAttention": PatchedAttention,
 					"QuantizedRPE": QuantizedRPE,
@@ -375,7 +352,7 @@ def main():
 	# plt.plot([0, 1], [0, 1], "k--")
 	# plt.xlabel("FPR"); plt.ylabel("TPR"); plt.title("ROC curves")
 	# plt.legend(loc="lower right"); plt.tight_layout()
-	# plt.savefig(os.path.join(args.save_dir, "roc_curves_ptv3.png"))
+	# plt.savefig(os.path.join(args.save_dir, "roc_curves_phat_jet.png"))
 	# plt.close()
 	# for lab, val in one_over_fpr.items():
 	# 	logging.info("1/FPR@0.8 for %s: %.3f", lab, val)
