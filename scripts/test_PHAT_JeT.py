@@ -17,7 +17,7 @@ import tensorflow as tf
 from sklearn.metrics import accuracy_score, roc_curve, auc, roc_auc_score
 import matplotlib.pyplot as plt
 
-from models.PointTransformerV3TF import build_ptv3_jet_classifier, build_jedi_ptv3_hybrid
+from models.PHAT_JeT import build_ptv3_jet_classifier, build_jedi_ptv3_hybrid
 
 
 def profile_gpu_memory_during_inference(model: tf.keras.Model, input_data: np.ndarray) -> tuple[float, float]:
@@ -143,7 +143,7 @@ def select_preset(model_size):
 
 
 def main():
-	parser = argparse.ArgumentParser(description="Test PointTransformerV3TF model")
+	parser = argparse.ArgumentParser(description="Test PHAT_JeT model")
 	parser.add_argument("--dataset", choices=["hls4ml","top","jetclass","QG"], required=True)
 	parser.add_argument("--data_dir", required=True)
 	parser.add_argument("--save_dir", required=True)
@@ -292,20 +292,20 @@ def main():
 			# If a full-model H5 was saved (e.g., by ModelCheckpoint without save_weights_only=True),
 			# we need to pass custom objects to reconstruct the model.
 			try:
-				from models.PointTransformerV3TF import (
-						PTv3Block,
-						GeometricCPE,
-						PatchedAttention,
-						QuantizedRPE,
-						GeometricPooling,
-					)
+				from models.PHAT_JeT import (
+					PTv3Block,
+					GeometricCPE,
+					PatchedAttention,
+					QuantizedRPE,
+					GeometricPooling,
+				)
 				custom_objects = {
-						"PTv3Block": PTv3Block,
-						"GeometricCPE": GeometricCPE,
-						"PatchedAttention": PatchedAttention,
-						"QuantizedRPE": QuantizedRPE,
-						"GeometricPooling": GeometricPooling,
-		        }
+					"PTv3Block": PTv3Block,
+					"GeometricCPE": GeometricCPE,
+					"PatchedAttention": PatchedAttention,
+					"QuantizedRPE": QuantizedRPE,
+					"GeometricPooling": GeometricPooling,
+				}
 
 				model = tf.keras.models.load_model(
 					weights_path, custom_objects=custom_objects, compile=False

@@ -1,6 +1,6 @@
 import tensorflow as tf
 from tensorflow.keras import layers, Model
-from models.PointTransformerV3TF import GeometricCPE
+from models.PHAT_JeT import GeometricCPE
 
 # ---------------------------
 # Aggregation Layer (unchanged)

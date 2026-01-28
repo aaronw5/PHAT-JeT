@@ -25,7 +25,7 @@ from sklearn.metrics import accuracy_score, roc_curve, auc, roc_auc_score
 import matplotlib.pyplot as plt
 
 # import model builders
-from models.PointTransformerV3TF import build_ptv3_jet_classifier, build_jedi_ptv3_hybrid
+from models.PHAT_JeT import build_ptv3_jet_classifier, build_jedi_ptv3_hybrid
 
 
 # ---------------------------
@@ -288,7 +288,7 @@ def run_testing(model, dataset, data_dir, save_dir, sort_by, batch_size, num_par
 # Argument parsing and main
 # ---------------------------
 def parse_args():
-		p = argparse.ArgumentParser(description="Train PointTransformerV3TF on jet data")
+		p = argparse.ArgumentParser(description="Train PHAT_JeT on jet data")
 		p.add_argument("--data_dir", required=True)
 		p.add_argument("--save_dir", required=True)
 		p.add_argument(
