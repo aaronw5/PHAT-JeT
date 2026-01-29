@@ -1,6 +1,6 @@
 import tensorflow as tf
 from tensorflow.keras import layers, Model
-from models.PHAT_JeT import GeometricCPE
+from models.PHAT_JeT import GeometricMessagePassing
 
 # ---------------------------
 # Aggregation Layer (unchanged)
