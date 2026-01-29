@@ -5,6 +5,12 @@ Official implementation of **PHAT-JeT** (Patch Hierarchical Attention Transforme
 
 PHAT-JeT addresses the challenge of performing accurate jet tagging under the extreme latency and resource constraints imposed by real-time trigger systems at the Large Hadron Collider (LHC). While transformer models achieve state-of-the-art accuracy in particle-level jet classification, their quadratic computational cost hinders deployment in real-time applications where decisions must be made within ~10 microseconds.
 
+<p align="center">
+  <img src="figures/jet_cone.png" alt="Jet Cone Structure" width="600"/>
+</p>
+
+*Particle jets in the detector coordinate system (η, φ). Each jet consists of collimated particle showers that must be efficiently classified in real-time.*
+
 ### Key Features
 
 - **Geometric Message Passing (GMP)**: Physics-inspired module that encodes local detector-plane structure using lightweight 2D convolutions on a coarse grid to capture energy flow patterns
@@ -14,23 +20,9 @@ PHAT-JeT addresses the challenge of performing accurate jet tagging under the ex
 
 ## Architecture
 
-```
-Input Particles (pt, η, φ)
-        ↓
-  GMP Module (2D Conv)
-        ↓
-   PHAT Block
-   ├─ Patch Partitioning
-   ├─ Local Attention (Intra-Patch)
-   ├─ Global Attention (Patch Tokens)
-   └─ Residual Connections
-        ↓
-  Global Pooling
-        ↓
-      MLP
-        ↓
-Class Probabilities
-```
+<p align="center">
+  <img src="figures/architecture.png" alt="PHAT-JeT Architecture" width="800"/>
+</p>
 
 The PHAT block partitions input particles into patches before computing attention, enabling efficient processing while maintaining global context through patch-token interactions.
 
@@ -160,6 +152,12 @@ PHAT-JeT/
 ```
 
 ## Key Components
+
+<p align="center">
+  <img src="figures/components.png" alt="PHAT-JeT Key Components" width="900"/>
+</p>
+
+*Detailed view of PHAT-JeT's core components: Geometric Message Passing (GMP) and Hierarchical Patch Attention mechanism.*
 
 ### Geometric Message Passing (GMP)
 
