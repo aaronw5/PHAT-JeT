@@ -311,7 +311,6 @@ def parse_args():
 		p.add_argument("--cpe_k", type=int, default=8)
 		p.add_argument("--grid_size", type=float, default=0.05, help="GeometricCPE grid size (coarser -> smaller grid)")
 		p.add_argument("--morton_grid_size", type=float, default=0.05, help="Grid size for morton sorting (separate from GeometricCPE grid_size)")
-		p.add_argument("--use_rpe", action="store_true")
 		p.add_argument("--disable_pool", action="store_true", help="Disable GeometricPooling between stages")
 		p.add_argument("--dropout", type=float, default=0.0)
 		p.add_argument("--aggregation", choices=["mean", "max"], default="max")
@@ -410,12 +409,12 @@ def main():
 
 		# select preset
 		presets = {
-			"small":  dict(enc_dims=[16], enc_layers=[1], enc_heads=[4], enc_strides=[2], enc_patch_sizes=[25], cpe_k=8, use_rpe=False),
-			"small_2layer_no_downsamp": dict(enc_dims=[16, 16], enc_layers=[1, 1], enc_heads=[4, 4], enc_strides=[1, 1], enc_patch_sizes=[25, 25], cpe_k=8, use_rpe=False),
-			"small_2layer_2_downsamp": dict(enc_dims=[16, 16], enc_layers=[1, 1], enc_heads=[4, 4], enc_strides=[2], enc_patch_sizes=[25, 25], cpe_k=8, use_rpe=False),
-    		"matched": dict(enc_dims=[12, 16], enc_layers=[1, 1], enc_heads=[4, 4], enc_strides=[2], enc_patch_sizes=[25, 25], cpe_k=8, use_rpe=False),
-    		"medium": dict(enc_dims=[12, 24, 32], enc_layers=[1, 1, 1], enc_heads=[4, 4, 4], enc_strides=[2, 2], enc_patch_sizes=[25, 25, 25], cpe_k=8, use_rpe=False),
-    		"large":  dict(enc_dims=[16, 24, 32], enc_layers=[1, 1, 1], enc_heads=[4, 4, 4], enc_strides=[2, 2], enc_patch_sizes=[25, 25, 25], cpe_k=8, use_rpe=False),
+			"small":  dict(enc_dims=[16], enc_layers=[1], enc_heads=[4], enc_strides=[2], enc_patch_sizes=[25], cpe_k=8),
+			"small_2layer_no_downsamp": dict(enc_dims=[16, 16], enc_layers=[1, 1], enc_heads=[4, 4], enc_strides=[1, 1], enc_patch_sizes=[25, 25], cpe_k=8),
+			"small_2layer_2_downsamp": dict(enc_dims=[16, 16], enc_layers=[1, 1], enc_heads=[4, 4], enc_strides=[2], enc_patch_sizes=[25, 25], cpe_k=8),
+    		"matched": dict(enc_dims=[12, 16], enc_layers=[1, 1], enc_heads=[4, 4], enc_strides=[2], enc_patch_sizes=[25, 25], cpe_k=8),
+    		"medium": dict(enc_dims=[12, 24, 32], enc_layers=[1, 1, 1], enc_heads=[4, 4, 4], enc_strides=[2, 2], enc_patch_sizes=[25, 25, 25], cpe_k=8),
+    		"large":  dict(enc_dims=[16, 24, 32], enc_layers=[1, 1, 1], enc_heads=[4, 4, 4], enc_strides=[2, 2], enc_patch_sizes=[25, 25, 25], cpe_k=8),
     	}
 		cfg = presets[args.model_size]
 		enc_dims = cfg["enc_dims"]
@@ -430,7 +429,6 @@ def main():
 		    raise ValueError(f"enc_patch_sizes has len {len(enc_patch_sizes)} but expected {n_stages} (stages)")
 
 		cpe_k = cfg["cpe_k"] if args.cpe_k is None else args.cpe_k
-		use_rpe = args.use_rpe or cfg["use_rpe"]
 
 		# build and compile model
 		logging.info("Flash Attention enabled: %s", args.use_flash_attention)
@@ -444,8 +442,7 @@ def main():
 				enc_strides=enc_strides,
 				cpe_k=cpe_k,
 				grid_size=args.grid_size,
-				use_rpe=use_rpe,
-				use_cpe=True,
+					use_cpe=True,
 				use_pool=(not args.disable_pool),
 				dropout=args.dropout,
 				aggregation=args.aggregation,
