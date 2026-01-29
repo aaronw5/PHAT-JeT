@@ -132,12 +132,12 @@ def load_test_data(dataset, data_dir, num_particles):
 
 def select_preset(model_size):
 	presets = {
-		"small":  dict(enc_dims=[16], enc_layers=[1], enc_heads=[4], enc_strides=[2], enc_patch_sizes=[25], cpe_k=8, use_rpe=False),
-		"small_2layer_no_downsamp": dict(enc_dims=[16, 16], enc_layers=[1, 1], enc_heads=[4, 4], enc_strides=[1, 1], enc_patch_sizes=[25, 25], cpe_k=8, use_rpe=False),
-		"small_2layer_2_downsamp": dict(enc_dims=[16, 16], enc_layers=[1, 1], enc_heads=[4, 4], enc_strides=[2], enc_patch_sizes=[25, 25], cpe_k=8, use_rpe=False),
-		"matched": dict(enc_dims=[12, 16], enc_layers=[1, 1], enc_heads=[4, 4], enc_strides=[2], enc_patch_sizes=[25, 25], cpe_k=8, use_rpe=False),
-		"medium": dict(enc_dims=[12, 24, 32], enc_layers=[1, 1, 1], enc_heads=[4, 4, 4], enc_strides=[2, 2], enc_patch_sizes=[25, 25, 25], cpe_k=8, use_rpe=False),
-		"large":  dict(enc_dims=[16, 24, 32], enc_layers=[1, 1, 1], enc_heads=[4, 4, 4], enc_strides=[2, 2], enc_patch_sizes=[25, 25, 25], cpe_k=8, use_rpe=False),
+		"small":  dict(enc_dims=[16], enc_layers=[1], enc_heads=[4], enc_strides=[2], enc_patch_sizes=[25], cpe_k=8),
+		"small_2layer_no_downsamp": dict(enc_dims=[16, 16], enc_layers=[1, 1], enc_heads=[4, 4], enc_strides=[1, 1], enc_patch_sizes=[25, 25], cpe_k=8),
+		"small_2layer_2_downsamp": dict(enc_dims=[16, 16], enc_layers=[1, 1], enc_heads=[4, 4], enc_strides=[2], enc_patch_sizes=[25, 25], cpe_k=8),
+		"matched": dict(enc_dims=[12, 16], enc_layers=[1, 1], enc_heads=[4, 4], enc_strides=[2], enc_patch_sizes=[25, 25], cpe_k=8),
+		"medium": dict(enc_dims=[12, 24, 32], enc_layers=[1, 1, 1], enc_heads=[4, 4, 4], enc_strides=[2, 2], enc_patch_sizes=[25, 25, 25], cpe_k=8),
+		"large":  dict(enc_dims=[16, 24, 32], enc_layers=[1, 1, 1], enc_heads=[4, 4, 4], enc_strides=[2, 2], enc_patch_sizes=[25, 25, 25], cpe_k=8),
 	}
 	return presets[model_size]
 
@@ -152,7 +152,6 @@ def main():
 	parser.add_argument("--model_size", choices=["small", "small_2layer_no_downsamp", "small_2layer_2_downsamp", "matched", "medium", "large"], default="small")
 	parser.add_argument("--enc_patch_sizes", type=int, nargs="+", default=None)
 	parser.add_argument("--disable_pool", action="store_true", help="Disable GeometricPooling between stages")
-	parser.add_argument("--use_rpe", action="store_true", help="Enable RPE regardless of preset")
 	parser.add_argument("--grid_size", type=float, default=0.2, help="GeometricCPE grid size (coarser -> smaller grid)")
 	parser.add_argument("--morton_grid_size", type=float, default=0.05, help="Grid size for morton sorting (separate from GeometricCPE grid_size)")
 	parser.add_argument("--aggregation", choices=["mean", "max"], default="max", help="Aggregation method for final pooling")
@@ -219,7 +218,6 @@ def main():
 	if len(enc_patch_sizes) != n_stages:
 		raise ValueError(f"enc_patch_sizes has len {len(enc_patch_sizes)} but expected {n_stages} (stages)")
 	cpe_k = cfg["cpe_k"]
-	use_rpe = args.use_rpe or cfg["use_rpe"]
 
 	# Build PHAT-JeT model
 	logging.info("Building PHAT-JeT model")
@@ -231,8 +229,7 @@ def main():
 				enc_strides=enc_strides,
 				enc_heads=enc_heads,
 				enc_patch_sizes=enc_patch_sizes,
-				use_rpe=use_rpe,
-				cpe_k=cpe_k,
+					cpe_k=cpe_k,
 				grid_size=args.grid_size,
 				use_pool=(not args.disable_pool),
 				use_cpe=True,
@@ -273,14 +270,12 @@ def main():
 					PHATBlock,
 					GeometricCPE,
 					PatchedAttention,
-					QuantizedRPE,
 					GeometricPooling,
 				)
 				custom_objects = {
 					"PHATBlock": PHATBlock,
 					"GeometricCPE": GeometricCPE,
 					"PatchedAttention": PatchedAttention,
-					"QuantizedRPE": QuantizedRPE,
 					"GeometricPooling": GeometricPooling,
 				}
 
