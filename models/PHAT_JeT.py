@@ -14,8 +14,9 @@ except ImportError:
 
 # ========== Core Components ==========
 
+=======
+class GeometricMessagePassing(layers.Layer):
 
-class GeometricCPE(layers.Layer):
     """
     Convolutional Position Encoding that respects jet geometry.
     Uses 2D convolution on (eta, phi) grid.
@@ -512,7 +513,7 @@ class PHATBlock(layers.Layer):
 
         self.use_cpe = use_cpe
         if use_cpe:
-            self.cpe = GeometricCPE(d_model, kernel_size=cpe_k, grid_size=grid_size)
+            self.cpe = GeometricMessagePassing(d_model, kernel_size=cpe_k, grid_size=grid_size)
 
         self.norm1 = layers.LayerNormalization(epsilon=1e-6)
         self.attn = PatchedAttention(
