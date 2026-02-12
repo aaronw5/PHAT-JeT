@@ -14,7 +14,6 @@ except ImportError:
 
 # ========== Core Components ==========
 
-=======
 class GeometricMessagePassing(layers.Layer):
 
     """
